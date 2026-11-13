@@ -61,7 +61,7 @@ td small{display:block;font-size:11px;opacity:.85}td.ok{background:var(--okb);co
 <nav><button data-t="rekap" class="on">Rekap Operator</button><button data-t="demo">Demografi</button><button data-t="rapor">Raport Per Orang</button></nav>
 <main>
 <section id="rekap"><div class="cards" id="cards"></div><div id="mw"></div>
-<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px"><input id="q" placeholder="🔍 Cari nama / ID…" style="width:min(320px,100%)"><button id="xl">⬇️ Export Excel</button><button class="ghost" id="hp">🙈 Sembunyikan kolom Penempatan</button></div>
+<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px"><input id="q" placeholder="🔍 Cari nama / ID…" style="width:min(320px,100%)"><button id="xl">⬇️ Export Excel</button><button class="ghost" id="nw">🕒 Data terbaru</button><button class="ghost" id="hp">🙈 Sembunyikan kolom Penempatan</button></div>
 <div class="tw"><table><thead id="th"></thead><tbody id="tb"></tbody></table></div>
 <p class="na">Hijau ≥ 60%, merah &lt; 60%. Klik judul kolom untuk mengurutkan, klik baris untuk membuka raport. Jika 1 ID mengulang ujian, hanya percobaan terakhir yang selesai dalam rentang tanggal yang dihitung.</p></section>
 <section id="demo" class="hide"><div class="grid" id="dg"></div></section>
@@ -76,6 +76,7 @@ const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 const f1=x=>x==null?'-':(Math.round(x*10)/10).toFixed(1)+'%';
 const cls=p=>p<60?'bad':'ok',nm=s=>String(s??'').trim().toLowerCase();
 let D,A=[],P=[],LR=[],QS={},cats=[],sk='s',sd=-1,sel=null,MM=false,HP=false;
+$('nw').onclick=()=>{sd=sk==='o'?-sd:-1;sk='o';rekap()};
 $('hp').onclick=()=>{HP=!HP;$('hp').textContent=HP?'👁 Tampilkan kolom Penempatan':'🙈 Sembunyikan kolom Penempatan';rekap()};
 /* ---- export Excel (sesuai filter, pencarian & urutan yang sedang tampil) ---- */
 $('xl').onclick=async()=>{
@@ -138,7 +139,7 @@ if(sessionStorage.getItem('pw'))enter(sessionStorage.getItem('pw'),true);
 
 function calc(){
   const a=$('from').value,b=$('to').value,m=new Map();
-  D.rows.forEach(r=>{if((a&&r.t<a)||(b&&r.t>b))return;m.set(r.id,r)}); // id sama: ambil percobaan terakhir
+  D.rows.forEach((r,i)=>{if((a&&r.t<a)||(b&&r.t>b))return;m.set(r.id,{...r,o:i})}); // id sama: ambil percobaan terakhir
   A=[...m.values()].map(r=>{
     const c={};cats.forEach(k=>c[k]={b:0,m:0});let tb=0,tm=0;const qs=[];
     r.rec.split(';').forEach(p=>{
@@ -195,6 +196,7 @@ function porsi(){
 const cell=(b,m)=>m?`<td class="${cls(b/m*100)}">${b}/${m}<small>${f1(b/m*100)}</small></td>`:'<td class="na">-</td>';
 function rekap(){
   $('th').parentNode.classList.toggle('cmp',HP);
+  $('nw').textContent=sk==='o'?(sd<0?'🕒 Terbaru dulu ▼':'🕒 Terlama dulu ▲'):'🕒 Data terbaru';$('nw').style.outline=sk==='o'?'2px solid #2a8a68':'';
   const n=P.length,s=P.map(p=>p.s),mm=P.filter(p=>p.ss!=null&&p.ss!==p.s).length;
   $('cards').innerHTML=[['👥','Peserta',n],['📈','Rata-rata nilai',n?(s.reduce((a,b)=>a+b,0)/n).toFixed(1):'-'],['🏆','Tertinggi',n?Math.max(...s):'-'],['📉','Terendah',n?Math.min(...s):'-'],['✅','Nilai ≥ 60',n?Math.round(s.filter(x=>x>=60).length/n*100)+'%':'-']]
     .map(([i,l,v])=>`<div class="card"><b>${v}</b><span>${i} ${l}</span></div>`).join('');
@@ -202,7 +204,7 @@ function rekap(){
   $('th').innerHTML='<tr>'+[['#',''],['n','Nama'],['id','ID'],['j','Jabatan'],...(HP?[]:[['pl','Pernah ditempatkan di']]),...cats.map(c=>[c,c]),['t','Total'],['s','Nilai']]
     .map(([k,l])=>k==='#'?'<th>#</th>':`<th data-k="${esc(k)}">${esc(l)}${sk===k?(sd>0?' ▲':' ▼'):''}</th>`).join('')+'</tr>';
   const q=nm($('q').value);
-  const val=p=>['n','id','j'].includes(sk)?nm(p[sk]):sk==='pl'?nm(p.pl.join()):sk==='s'?p.s:sk==='t'?(p.tm?p.tb/p.tm:null):(p.c[sk]&&p.c[sk].m?p.c[sk].b/p.c[sk].m:null);
+  const val=p=>sk==='o'?p.o:['n','id','j'].includes(sk)?nm(p[sk]):sk==='pl'?nm(p.pl.join()):sk==='s'?p.s:sk==='t'?(p.tm?p.tb/p.tm:null):(p.c[sk]&&p.c[sk].m?p.c[sk].b/p.c[sk].m:null);
   const L=LR=P.filter(p=>nm(p.id+' '+p.n).includes(q)&&(!MM||(p.ss!=null&&p.ss!==p.s))).sort((x,y)=>{let a=val(x),b=val(y);if(a==null)a=-1;if(b==null)b=-1;return(a>b?1:a<b?-1:0)*sd});
   $('tb').innerHTML=L.map((p,i)=>`<tr data-id="${esc(p.id)}"><td>${i+1}</td><td>${esc(p.n)}</td><td>${esc(p.id)}</td><td>${esc(p.j)}</td>${HP?'':`<td>${p.pl.map(x=>`<span class="cp" style="background:${cc(x)}">${esc(x)}</span>`).join('')}</td>`}`+cats.map(k=>cell(p.c[k].b,p.c[k].m)).join('')+cell(p.tb,p.tm)+`<td class="${cls(p.s)}" ${p.ss!=null&&p.ss!==p.s?`title="Score tersimpan di sheet: ${p.ss}"`:''}><b>${p.s}</b>${p.ss!=null&&p.ss!==p.s?' ⚠️':''}</td></tr>`).join('')||`<tr><td colspan="${cats.length+7-HP}" class="na">Tidak ada data dengan filter ini</td></tr>`;
 }
